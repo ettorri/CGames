@@ -21,7 +21,7 @@ npx serve .
 
 ## Publishing
 
-The site deploys to GitHub Pages automatically on every push to `main` through `.github/workflows/deploy.yml`. One-time setup in the GitHub repo: Settings → Pages → Source → **GitHub Actions**.
+Live at **https://ettorri.github.io/CGames/**. The site deploys to GitHub Pages automatically on every push to `main` through `.github/workflows/deploy.yml`; the workflow enables Pages on first run, so a fresh fork needs no manual setup.
 
 ## Adding a game
 
