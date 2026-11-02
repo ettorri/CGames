@@ -63,7 +63,12 @@ h1{font-family:var(--display);font-weight:400;font-size:5.6cqw;line-height:.95;m
 .btn:hover{transform:translateY(-2px)}
 .btn:active{transform:translateY(.4cqw);box-shadow:0 .2cqw 0 #9a5a00}
 .btn:focus-visible{outline:3px solid #fff;outline-offset:3px}
-.hint{font-size:1.7cqw;color:var(--muted);margin:0;font-weight:700}
+.hint{font-size:1.45cqw;color:var(--muted);margin:0;font-weight:700}
+#menu .sub{font-size:1.55cqw;max-width:64cqw}
+#menu .label{font-size:1.3cqw}
+.board1{grid-auto-flow:row;grid-template-rows:none;font-size:2.4cqw;gap:.6cqw}
+.board1 li{min-width:34cqw}
+.board1 .n{font-size:3cqw;width:3.5cqw}
 .hint b{color:var(--ink);background:rgba(255,255,255,.1);padding:.1em .45em;border-radius:5px;font-weight:900}
 .check{display:flex;align-items:center;gap:.8cqw;font-size:1.7cqw;font-weight:700;color:var(--muted);cursor:pointer}
 .check input{width:2cqw;height:2cqw;accent-color:var(--accent)}
@@ -157,7 +162,7 @@ h1{font-family:var(--display);font-weight:400;font-size:5.6cqw;line-height:.95;m
       <p class="sub">Nine worlds, three laps each. A top-3 finish unlocks the next level and scores points: 10 for 1st, 6 for 2nd, 2 for 3rd. Grab the <b>?</b> boxes for a turbo, dodge the banana peels, <b>Esc</b> pauses.</p>
       <div class="label">Driver</div>
       <div class="drivers" id="drivers"></div>
-      <button class="linkbtn" id="resetScores" type="button">Reset all scores</button>
+      <div class="row" style="gap:3cqw"><button class="linkbtn" id="showScores" type="button">Overall scores</button><button class="linkbtn" id="resetScores" type="button">Reset all scores</button></div>
       <div class="label">Pick your livery</div>
       <div class="swatches" id="swatches"></div>
       <div class="label">Level</div>
@@ -166,6 +171,15 @@ h1{font-family:var(--display);font-weight:400;font-size:5.6cqw;line-height:.95;m
       <p class="hint"><b>←</b> <b>→</b> steer &nbsp; <b>↑</b> gas &nbsp; <b>↓</b> brake &nbsp; (or <b>W</b><b>A</b><b>S</b><b>D</b>)</p>
       <label class="check"><input type="checkbox" id="sound" checked> Engine sound</label>
       <button class="btn" id="start">Start race</button>
+    </div>
+  </div>
+
+  <div class="overlay menu" id="scores" hidden>
+    <div class="card">
+      <h2>Overall scores</h2>
+      <p class="sub">10 points for 1st, 6 for 2nd, 2 for 3rd, every race, for keeps.</p>
+      <ol class="final board1" id="scoreList"></ol>
+      <button class="btn alt" id="closeScores">Back</button>
     </div>
   </div>
 
@@ -576,7 +590,7 @@ function buildTrack(lvl){
   }
   w.start.forEach(([def,offset],i)=>segments[i<2?4:8].sprites.push({def,offset}));
   // items on the road: ? boxes (turbo) and banana peels (spin out). More peels, fewer boxes, as levels go up.
-  const nBox=Math.max(4,8-Math.round(lf*4)),nBan=Math.round((4+lvl*2)*.75),used=new Set();
+  const nBox=Math.max(4,8-Math.round(lf*4)),nBan=Math.max(3,Math.round((4+lvl*2)*.5625)),used=new Set();
   const boxSegs=[];
   const place=(type,def)=>{for(let t=0;t<80;t++){const n=40+Math.floor(r()*(N-60));let ok=true;for(let k=-6;k<=6;k++)if(used.has(n+k)){ok=false;break}if(!ok)continue;if(type==='banana'&&(Math.abs(segments[n].curve)>2.5||boxSegs.some(b=>n-b>0&&n-b<16)))continue;// peels never sit in a sharp bend or right behind a box
     used.add(n);if(type==='box')boxSegs.push(n);const it={type,def,offset:(r()-.5)*1.3,taken:false,timer:0,seg:n};segments[n].items.push(it);items.push(it);return}};
@@ -589,7 +603,7 @@ const pct=(z,t)=>(z%t)/t;
 // ---------- state ----------
 let state='menu',keys={left:false,right:false,up:false,down:false};
 const LEVELS=9,KEY='torres-jungle-unlocked',DKEY='torres-jungle-driver';
-const DRIVERS=['Valentina','Martina','Mateo','Papi','Mami','Guest'];
+const DRIVERS=['Valentina','Martina','Mateo','Papi','Guest'];
 let level=1,unlocked=1,driver='Guest',pausedFrom=null;
 try{const d=localStorage.getItem(DKEY);if(DRIVERS.includes(d))driver=d}catch(e){}
 // each driver keeps their own unlocked level; older saves (before drivers existed) carry over
@@ -611,7 +625,7 @@ function reset(){
   const lanes=[0,-0.55,0.55,-0.25,0.25,-0.7,0.7,-0.4,0.4,-0.1,0.1,-0.6];let i=0;racers=[];
   for(const k of ORDER.slice(0,BASE_RACERS+level)){
     const def=ANIMALS[k];
-    const r={def,z:playerZ+SEG*2.2*(i+1),offset:lanes[i],speed:0,base:def.base,laps:0,t:0,bf:.25+Math.random()*.3,bp:Math.random()*6,anim:0,pct:0,wander:(Math.random()-.5)};
+    const r={def,z:playerZ+SEG*2.2*(i+1),offset:lanes[i],speed:0,base:def.base,laps:0,t:0,bf:.25+Math.random()*.3,bp:Math.random()*6,anim:0,pct:0,wander:(Math.random()-.5),spin:0,imm:0};
     find(r.z).racers.push(r);racers.push(r);i++;
   }
 }
@@ -671,14 +685,18 @@ function updateRacers(dt){
     const gap=(r.laps*trackLen+r.z)-meTotal;
     if(gap>trackLen*.1)target*=aheadF;else if(gap<-trackLen*.08)target*=behindF;
     if(state==='finished')target*=.9;
-    const want=Math.min(target,1.05)*MAXS;
-    r.speed+=clamp(want-r.speed,-ACC*dt*2,ACC*dt*.95);
+    if(r.spin>0)r.spin-=dt;if(r.imm>0)r.imm-=dt;
+    const want=r.spin>0?0:Math.min(target,1.05)*MAXS;
+    r.speed+=clamp(want-r.speed,-ACC*dt*(r.spin>0?6:2),ACC*dt*.95);
     r.offset+=Math.sin(r.t*.6+r.bp)*.0012+r.wander*dt*.02;
     r.offset=clamp(r.offset,-.8,.8);
     const old=find(r.z),pz=r.z;
     r.z=increase(r.z,dt*r.speed,trackLen);if(r.z<pz)r.laps++;
     r.pct=pct(r.z,SEG);
     const nw=find(r.z);if(old!==nw){old.racers.splice(old.racers.indexOf(r),1);nw.racers.push(r)}
+    // animals slip on banana peels too (the peel stays; they get a few seconds of immunity after a spin)
+    if(old!==nw&&r.imm<=0){const N=segments.length;let steps=(nw.index-old.index+N)%N;if(steps>4)steps=0;const rw=r.def.ww/ROADW;
+      for(let k=1;k<=steps;k++){for(const it of segments[(old.index+k)%N].items){if(it.type==='banana'&&!it.taken&&overlap(r.offset,rw,it.offset,it.def.ww/ROADW,.7)){r.spin=1.2;r.imm=14;r.speed*=.15;break}}if(r.spin>0)break}}
     r.anim+=dt*(r.speed/MAXS)*11;
   }
   for(const a of racers)for(const b of racers){if(a===b)continue;let dz=b.z-a.z;if(dz<-trackLen/2)dz+=trackLen;if(dz>trackLen/2)dz-=trackLen;
@@ -690,6 +708,11 @@ let lastPts=0;
 function getScore(name){try{return parseInt(localStorage.getItem(SKEY+'-'+name.toLowerCase()))||0}catch(e){return 0}}
 function addScore(name,pts){try{localStorage.setItem(SKEY+'-'+name.toLowerCase(),String(getScore(name)+pts))}catch(e){}}
 function resetScores(){for(const n of DRIVERS){try{localStorage.removeItem(SKEY+'-'+n.toLowerCase())}catch(e){}}}
+function showScores(){
+  const rows=DRIVERS.map(n=>({n,s:getScore(n)})).sort((a,b)=>b.s-a.s);
+  $('scoreList').innerHTML=rows.map((r,i)=>'<li class="'+(r.n===driver?'me':'')+'"><span class="n">'+(i+1)+'</span>'+r.n+'<span class="t">'+r.s+' pt'+(r.s===1?'':'s')+'</span></li>').join('');
+  $('scores').hidden=false;$('closeScores').focus();
+}
 function finish(){
   state='finished';finishRank=standings().findIndex(s=>s.player)+1;
   lastPts=POINTS[finishRank]||0;if(lastPts)addScore(driver,lastPts);
@@ -713,9 +736,10 @@ function renderSeg(seg){
   if(col.lane){const lw1=p1.w*2/LANES,lw2=p2.w*2/LANES;let lx1=p1.x-p1.w+lw1,lx2=p2.x-p2.w+lw2;for(let l=1;l<LANES;l++){poly(lx1-l1/2,p1.y,lx1+l1/2,p1.y,lx2+l2/2,p2.y,lx2-l2/2,p2.y,col.lane);lx1+=lw1;lx2+=lw2}}
   if(seg.fog<1){ctx.fillStyle='rgba('+FOGC+','+(1-seg.fog).toFixed(3)+')';ctx.fillRect(0,p2.y,W,p1.y-p2.y)}
 }
-function drawSprite(img,ww,scale,destX,destY,ox,oy,clipY,alpha){
+function drawSprite(img,ww,scale,destX,destY,ox,oy,clipY,alpha,rot){
   const destW=ww*scale*W/2,destH=destW*img.height/img.width;
   destX+=destW*ox;destY+=destH*oy;
+  if(rot){ctx.save();ctx.globalAlpha=alpha;ctx.translate(destX+destW/2,destY+destH/2);ctx.rotate(rot);ctx.drawImage(img,-destW/2,-destH/2,destW,destH);ctx.restore();return}
   const clipH=clipY?Math.max(0,destY+destH-clipY):0;
   if(clipH<destH){ctx.globalAlpha=alpha;ctx.drawImage(img,0,0,img.width,img.height-(img.height*clipH/destH),destX,destY,destW,destH-clipH);ctx.globalAlpha=1}
 }
@@ -750,7 +774,7 @@ function render(){
       const sc=lerp(seg.p1.screen.scale,seg.p2.screen.scale,r.pct);
       const sx=lerp(seg.p1.screen.x,seg.p2.screen.x,r.pct)+sc*r.offset*ROADW*W/2;
       const sy=lerp(seg.p1.screen.y,seg.p2.screen.y,r.pct);
-      drawSprite(r.def.frames[Math.floor(r.anim)%FRAMES],r.def.ww,sc,sx,sy,-.5,-1,seg.clip,alpha);
+      drawSprite(r.def.frames[Math.floor(r.anim)%FRAMES],r.def.ww,sc,sx,sy,-.5,-1,seg.clip,alpha,r.spin>0?(1-r.spin/1.2)*Math.PI*4:0);
     }
     for(const sp of seg.sprites){
       const sc=seg.p1.screen.scale,sx=seg.p1.screen.x+sc*sp.offset*ROADW*W/2;
@@ -856,7 +880,7 @@ $('tomenu').addEventListener('click',toMenu);
 // ---------- input ----------
 const KEYMAP={ArrowLeft:'left',KeyA:'left',ArrowRight:'right',KeyD:'right',ArrowUp:'up',KeyW:'up',ArrowDown:'down',KeyS:'down'};
 window.addEventListener('keydown',e=>{
-  if(e.code==='Escape'){if(state==='paused')resume();else pause();e.preventDefault();return}
+  if(e.code==='Escape'){if(!$('scores').hidden){$('scores').hidden=true}else if(state==='paused')resume();else pause();e.preventDefault();return}
   if(state==='paused'){if(e.code==='Enter')resume();return}
   const k=KEYMAP[e.code];if(k){keys[k]=true;e.preventDefault()}
   if(e.code==='Enter'&&(state==='menu'||(state==='finished'&&!$('results').hidden)))startRace()});
@@ -878,6 +902,8 @@ const resetBtn=$('resetScores');
 function disarmReset(){clearTimeout(resetArm);resetArm=null;resetBtn.textContent='Reset all scores';resetBtn.classList.remove('warn')}
 resetBtn.addEventListener('click',()=>{if(resetArm){resetScores();disarmReset();buildDrivers();resetBtn.textContent='Scores reset';setTimeout(disarmReset,2000)}else{resetBtn.textContent='Really reset everyone’s points? Click again';resetBtn.classList.add('warn');resetArm=setTimeout(disarmReset,4000)}});
 $('resMenu').addEventListener('click',toMenu);
+$('showScores').addEventListener('click',showScores);
+$('closeScores').addEventListener('click',()=>{$('scores').hidden=true;$('showScores').focus()});
 buildDrivers();
 buildLevels();
 const sw=$('swatches');
